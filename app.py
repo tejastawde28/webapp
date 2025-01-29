@@ -78,6 +78,6 @@ def method_not_allowed(e):
 if __name__ == '__main__':
     try:
         bootstrap_db()
-        app.run(debug=True)
+        app.run(debug=False)
     except Exception as e:
         print("Exception occurred while starting application: ", e)
