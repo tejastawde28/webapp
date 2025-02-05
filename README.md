@@ -1,46 +1,61 @@
-# webapp
-Submission for Assignment-01 for the course CSYE-6225\
-Following are the set-up requirements and instructions to run the app locally -
+# Submission for Assignment-01 for the course CSYE-6225
+
+Following are the set-up requirements and instructions to run the app locally on a virtual Linux machine:
+
 ## Requirements
 
 - Python 3.x
-- Flask
-- Flask-SQLAlchemy
-- MySQL
+- Flask==2.0.2
+- Flask-SQLAlchemy==2.5.1
+- mysqlclient==2.0.3
+- MySQL Server (or MariaDB/PostgreSQL if preferred)
 
 ## Setup
 
-1. Clone the repository:
+1. **Clone the repository**:
     ```sh
     git clone <repository-url>
     cd <repository-directory>
     ```
 
-2. Create a virtual environment and activate it:
+2. **Create a virtual environment and activate it**:
     ```sh
-    python -m venv venv
-    source <directory-to-venv>/venv/bin/activate  # On Windows use `venv\Scripts\activate`
+    python3 -m venv venv
+    source venv/bin/activate
     ```
 
-3. Install the required packages:
+3. **Install the required packages**:
     ```sh
     pip install -r requirements.txt
     ```
 
-4. Update the database URI in :
-    ```python
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://<username>:<password>@<host>/<database>'
-    ```
-    > **Make sure to create the database manually on MySQLWorkbench or any MySQL Client you're working on before running the project.**
+4. **Set up MySQL Database**:
+    - Install MySQL Server if it's not already installed (can be modified for PostgreSQL or MariaDB).
+    - Create a new database and user:
+        ```sh
+        mysql -u root -p
+        CREATE DATABASE <database-name>;
+        CREATE USER '<username>'@'localhost' IDENTIFIED BY '<password>';
+        GRANT ALL PRIVILEGES ON <database-name>.* TO '<username>'@'localhost';
+        FLUSH PRIVILEGES;
+        EXIT;
+        ```
 
-5. Initialize the database:
+5. **Update the database URI**:
+    - Modify the following line in your `app.py` file:
+    ```python
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://<username>:<password>@localhost/<database-name>'
+    ```
+
+6. **Initialize the database**:
+    - Run the following command to create tables in the MySQL database:
     ```sh
     python app.py
     ```
 
 ## Running the Application
 
-1. Start the Flask application:
+1. **Start the Flask application**:
     ```sh
     python app.py
     ```
