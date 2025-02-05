@@ -21,8 +21,10 @@ def bootstrap_db():
 
 @app.route('/healthz', methods=['GET'])
 def health_check():
+    if request.method not in ['GET']:
+        return method_not_allowed(None)
 
-    if request.data or request.form:
+    if request.data or request.form or request.args:
         response = app.response_class(
             response='',
             status=400,
@@ -74,6 +76,11 @@ def method_not_allowed(e):
         }
     )
     return response
+
+@app.before_request
+def block_options_request():
+    if request.method == 'OPTIONS':
+        return method_not_allowed(None)
 
 if __name__ == '__main__':
     try:
