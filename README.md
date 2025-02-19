@@ -1,14 +1,16 @@
-# Submission for Assignment-01 for the course CSYE-6225
+# WebApp for the course CSYE-6225
 
-Following are the set-up requirements and instructions to run the app locally on a virtual Linux machine:
+Following are the set-up requirements and instructions to run the app locally:
 
 ## Requirements
 
 - Python 3.x
-- Flask==2.0.2
-- Flask-SQLAlchemy==2.5.1
-- mysqlclient==2.0.3
+- Flask
+- Flask-SQLAlchemy
+- mysqlclient
 - MySQL Server (or MariaDB/PostgreSQL if preferred)
+- Werkzeug
+- pytest (to run tests)
 
 ## Setup
 
@@ -40,12 +42,14 @@ Following are the set-up requirements and instructions to run the app locally on
         FLUSH PRIVILEGES;
         EXIT;
         ```
+> Enter your username and password in place of `<username>` and `<password>`.
 
 5. **Update the database URI**:
     - Modify the following line in your `app.py` file:
     ```python
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://<username>:<password>@localhost/<database-name>'
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://<username>:<password>@<localhost>/<database-name>'
     ```
+> Make sure to configure the Database URL as per your database before running the project. Also substitute your credentials/port value in place of `<username>`, `<password>`, `<localhost>` and `<database-name>`
 
 6. **Initialize the database**:
     - Run the following command to create tables in the MySQL database:
@@ -72,5 +76,20 @@ Following are the set-up requirements and instructions to run the app locally on
 - `400 Bad Request`: Returned if the request contains data or form parameters.
 - `503 Service Unavailable`: Returned if there is an error while inserting data into the database.
 
-### Testing CI Workflow
-Added this content to test CI workflow
+## Running Tests
+1. Install `pytest` in your `venv`
+```sh
+pip install pytest
+```
+2. Set the environment variable `TESTING` as `True` as follows for mac/Linux
+```sh
+export TESTING="True"
+```
+or as follows for Windows 
+```sh
+set TESTING=True
+```
+3. Run the test
+```sh
+pytest --verbose
+```
