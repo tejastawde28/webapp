@@ -1,4 +1,4 @@
-name: CI - Flask Web App
+name: webapp-pr-check
 
 on:
   pull_request:
