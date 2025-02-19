@@ -71,3 +71,6 @@ Following are the set-up requirements and instructions to run the app locally on
 - `405 Method Not Allowed`: Returned if the request method is not `GET`.
 - `400 Bad Request`: Returned if the request contains data or form parameters.
 - `503 Service Unavailable`: Returned if there is an error while inserting data into the database.
+
+### Testing CI Workflow
+Added this content to test CI workflow
