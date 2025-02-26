@@ -46,7 +46,7 @@ def health_check():
         db.session.commit()
         response = app.response_class(
             response='',
-            status=201,
+            status=200,
             headers = {
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
                 'Pragma': 'no-cache',
