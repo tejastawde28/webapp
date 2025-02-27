@@ -53,10 +53,12 @@ variable "db_password" {
 
 variable "dev_account_id" {
   type = string
+  default = "442426868126"
 }
 
 variable "demo_account_id" {
   type = string
+  default = "980921734991"
 }
 
 source "amazon-ebs" "webapp-ami" {
