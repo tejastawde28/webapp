@@ -33,7 +33,7 @@ jobs:
           pytest --verbose
 
   build-custom-image:
-    name: Build Custom Image in AWS & GCP
+    name: Build Custom Image with Packer
     needs: integration-test
     runs-on: ubuntu-latest
 
@@ -54,11 +54,14 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ vars.AWS_REGION }}
         run: |
-          echo "Setting up AWS credentials..."
-          aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
-          aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
-          aws configure set region $AWS_DEFAULT_REGION
-          aws sts get-caller-identity
+          echo "AWS credentials set."
+
+      - name: Verify AWS Identity
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ vars.AWS_REGION }}
+        run: aws sts get-caller-identity
 
       - name: Install Packer
         uses: hashicorp/setup-packer@v2
@@ -66,11 +69,18 @@ jobs:
           version: latest
 
       - name: Enable Packer Logging
-        run: |
-          export PACKER_LOG=1
-          export PACKER_LOG_PATH="packer.log"
+        env:
+          PACKER_LOG: 1
+          PACKER_LOG_PATH: "packer.log"
+        run: echo "Packer logging enabled."
 
       - name: Build Image with Packer
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ vars.AWS_REGION }}
+          PACKER_LOG: 1
+          PACKER_LOG_PATH: "packer.log"
         run: |
           packer init packer/webapp.pkr.hcl
           packer build -var "db_password=${{ secrets.DB_PASSWORD }}" packer/webapp.pkr.hcl
