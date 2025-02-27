@@ -8,6 +8,7 @@ User=csye6225
 Group=csye6225
 WorkingDirectory=/opt/csye6225/webapp
 ExecStart=/opt/venv/bin/python /opt/csye6225/webapp/app.py
+EnvironmentFile=/etc/environment
 Environment="PATH=/opt/venv/bin:$PATH"
 Restart=always
 RestartSec=3

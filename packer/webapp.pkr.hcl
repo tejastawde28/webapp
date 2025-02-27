@@ -155,11 +155,12 @@ build {
   provisioner "shell" {
     inline = [
       "set -ex",
-      "echo 'Setting environment variables'",
-      "export DB_USERNAME=${var.db_user}",
-      "export DB_PASSWORD=${var.db_password}",
-      "export DB_NAME=${var.db_name}",
-      "echo 'Copying csye6225.service to systemd directory'",
+      "echo 'Setting environment variables in /etc/environment'",
+      "echo 'DB_USERNAME=${var.db_user}' | sudo tee -a /etc/environment",
+      "echo 'DB_PASSWORD=${var.db_password}' | sudo tee -a /etc/environment",
+      "echo 'DB_NAME=${var.db_name}' | sudo tee -a /etc/environment",
+      ". /etc/environment",
+      "echo 'Creating systemd service file'",
       "sudo cp /tmp/webapp/csye6225.service /etc/systemd/system/csye6225.service",
       "echo 'Reloading systemd daemon'",
       "sudo systemctl daemon-reload",
