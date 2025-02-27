@@ -154,9 +154,18 @@ build {
   }
   provisioner "shell" {
     inline = [
+      "set -ex",
+      "echo 'Setting environment variables'",
+      "export DB_USERNAME=${var.db_user}",
+      "export DB_PASSWORD=${var.db_password}",
+      "export DB_NAME=${var.db_name}",
+      "echo 'Copying csye6225.service to systemd directory'",
       "sudo cp /tmp/webapp/csye6225.service /etc/systemd/system/csye6225.service",
+      "echo 'Reloading systemd daemon'",
       "sudo systemctl daemon-reload",
+      "echo 'Enabling csye6225.service'",
       "sudo systemctl enable csye6225.service",
+      "echo 'Starting csye6225.service'",
       "sudo systemctl start csye6225.service"
     ]
   }

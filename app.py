@@ -7,7 +7,12 @@ app = Flask(__name__)
 if os.getenv('TESTING')=='True':
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
 else:
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://<username>:<password>@<host>/<database-name>'
+    db_username = os.getenv('DB_USERNAME')
+    db_password = os.getenv('DB_PASSWORD')
+    db_host = os.getenv('DB_HOST', 'localhost')
+    db_name = os.getenv('DB_NAME', 'webapp')
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql://{db_username}:{db_password}@{db_host}/{db_name}'
+
 db = SQLAlchemy(app)
 
 
