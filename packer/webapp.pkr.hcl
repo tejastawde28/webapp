@@ -52,11 +52,11 @@ variable "db_password" {
 }
 
 variable "dev_account_id" {
-  type    = string
+  type = string
 }
 
 variable "demo_account_id" {
-  type    = string
+  type = string
 }
 
 source "amazon-ebs" "webapp-ami" {
@@ -70,7 +70,7 @@ source "amazon-ebs" "webapp-ami" {
   ]
 
   ami_users = [
-    "${var.dev_account_id}", 
+    "${var.dev_account_id}",
     "${var.demo_account_id}",
   ]
 
@@ -147,7 +147,7 @@ build {
       "sudo mkdir -p /opt/csye6225",
       "sudo cp -r /tmp/webapp/* /opt/csye6225/",
       "echo 'Changing ownership of /opt/csye6225 directory...'",
-      "sudo chown -R $(whoami):$(whoami) /opt/csye6225"   
+      "sudo chown -R $(whoami):$(whoami) /opt/csye6225"
     ]
   }
   provisioner "shell" {
