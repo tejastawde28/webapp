@@ -52,12 +52,12 @@ variable "db_password" {
 }
 
 variable "dev_account_id" {
-  type = string
+  type    = string
   default = "442426868126"
 }
 
 variable "demo_account_id" {
-  type = string
+  type    = string
   default = "980921734991"
 }
 
