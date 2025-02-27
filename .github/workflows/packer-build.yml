@@ -1,0 +1,66 @@
+name: Packer Build
+
+on:
+  pull_request:
+    types:
+      - closed
+  workflow_dispatch:
+
+jobs:
+  integration-test:
+    name: Run Integration Tests
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt --upgrade --no-cache-dir
+
+      - name: Run Integration Tests
+        env:
+          TESTING: "True"
+        run: |
+          pytest --verbose
+
+  build-custom-image:
+    name: Build Custom Image in AWS
+    needs: integration-test
+    runs-on: ubuntu-latest
+    if: success()
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Packer
+        uses: hashicorp/setup-packer@v2
+        with:
+          version: latest
+
+      - name: Enable Packer Logging
+        run: |
+          export PACKER_LOG=1
+
+      - name: Build Image with Packer in AWS
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+        run: |
+          packer init packer/webapp.pkr.hcl
+          packer build -var "db_password=${{ secrets.DB_PASSWORD }}" packer/webapp.pkr.hcl
+
+      - name: Configure Systemd Service
+        run: |
+          sudo systemctl daemon-reload
+          sudo systemctl enable csye6225.service
