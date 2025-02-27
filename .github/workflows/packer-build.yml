@@ -91,8 +91,3 @@ jobs:
         with:
           name: packer-logs
           path: packer.log
-
-      - name: Configure Systemd Service
-        run: |
-          sudo systemctl daemon-reload
-          sudo systemctl enable csye6225.service

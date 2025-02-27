@@ -1,14 +1,14 @@
 [Unit]
-Description=CSYE 6225 App
-ConditionPathExists=/opt/application.properties
+Description=CSYE 6225 WebApp
 After=network.target
 
 [Service]
 Type=simple
 User=csye6225
 Group=csye6225
-WorkingDirectory=/opt/app
-ExecStart=/opt/app/healthcheck
+WorkingDirectory=/opt/csye6225/webapp
+ExecStart=/opt/venv/bin/python /opt/csye6225/webapp/app.py
+Environment="PATH=/opt/venv/bin:$PATH"
 Restart=always
 RestartSec=3
 StandardOutput=syslog

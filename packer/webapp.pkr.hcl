@@ -72,8 +72,8 @@ source "amazon-ebs" "webapp-ami" {
   ]
 
   ami_users = [
-    "${var.dev_account_id}",
-    "${var.demo_account_id}",
+    var.dev_account_id,
+    var.demo_account_id,
   ]
 
   instance_type = "${var.instance_type}"
@@ -146,15 +146,15 @@ build {
       "echo 'Installing Python packages'",
       "/opt/venv/bin/pip install Flask Flask-SQLAlchemy SQLAlchemy mysqlclient Werkzeug pytest",
       "echo 'Copying webapp contents to /opt/csye6225'",
-      "sudo mkdir -p /opt/csye6225",
-      "sudo cp -r /tmp/webapp/* /opt/csye6225/",
-      "echo 'Changing ownership of /opt/csye6225 directory...'",
-      "sudo chown -R $(whoami):$(whoami) /opt/csye6225"
+      "sudo mkdir -p /opt/csye6225/webapp",
+      "sudo cp -r /tmp/webapp/* /opt/csye6225/webapp/",
+      "echo 'Changing ownership of /opt/csye6225/webapp directory...'",
+      "sudo chown -R $(whoami):$(whoami) /opt/csye6225/webapp"
     ]
   }
   provisioner "shell" {
     inline = [
-      "sudo cp /tmp/webapp/packer/csye6225.service /etc/systemd/system/csye6225.service",
+      "sudo cp /tmp/webapp/csye6225.service /etc/systemd/system/csye6225.service",
       "sudo systemctl daemon-reload",
       "sudo systemctl enable csye6225.service",
       "sudo systemctl start csye6225.service"
