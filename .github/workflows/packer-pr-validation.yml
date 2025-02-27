@@ -1,0 +1,38 @@
+name: Packer PR Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  packer-check:
+    name: Validate Packer Template
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Packer
+        uses: hashicorp/setup-packer@v2
+        with:
+          version: latest
+
+      - name: Run packer fmt
+        id: packer-fmt
+        run: |
+          export PACKER_LOG=1
+          packer fmt -check packer/ || (echo "Packer fmt modified files, please format them before committing." && exit 1)
+
+      - name: Run packer validate
+        id: packer-validate
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          export PACKER_LOG=1
+          packer validate -var "db_password=${{ secrets.DB_PASSWORD }}" packer/webapp.pkr.hcl || (echo "Packer validation failed, please fix the errors." && exit 1)

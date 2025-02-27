@@ -89,6 +89,6 @@ def block_options_request():
 if __name__ == '__main__':
     try:
         bootstrap_db()
-        app.run(debug=False)
+        app.run(debug=False, host='0.0.0.0')
     except Exception as e:
         print("Exception occurred while starting application: ", e)

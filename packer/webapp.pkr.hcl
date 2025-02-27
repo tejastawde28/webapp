@@ -1,0 +1,161 @@
+packer {
+  required_plugins {
+    amazon = {
+      version = ">= 1.0.0, < 2.0.0"
+      source  = "github.com/hashicorp/amazon"
+    }
+  }
+}
+
+variable "aws_profile" {
+  type    = string
+  default = "dev"
+}
+
+variable "region" {
+  type    = string
+  default = "us-east-1"
+}
+
+variable "source_ami" {
+  type    = string
+  default = "ami-04b4f1a9cf54c11d0"
+}
+
+variable "instance_type" {
+  type    = string
+  default = "t2.micro"
+}
+
+variable "subnet_id" {
+  type    = string
+  default = "subnet-07ac8cfb0d5c02f4b"
+}
+
+variable "ssh_username" {
+  type    = string
+  default = "ubuntu"
+}
+
+variable "db_name" {
+  type    = string
+  default = "webapp"
+}
+
+variable "db_user" {
+  type    = string
+  default = "tejas"
+}
+
+variable "db_password" {
+  type = string
+}
+
+variable "dev_account_id" {
+  type    = string
+}
+
+variable "demo_account_id" {
+  type    = string
+}
+
+source "amazon-ebs" "webapp-ami" {
+  profile         = "${var.aws_profile}"
+  region          = "${var.region}"
+  ami_name        = "csye6225-webapp-spring25-${formatdate("YYYY-MM-DD", timestamp())}"
+  ami_description = "CSYE6225 Webapp Spring 2025 AMI"
+
+  ami_regions = [
+    "us-east-1",
+  ]
+
+  ami_users = [
+    "${var.dev_account_id}", 
+    "${var.demo_account_id}",
+  ]
+
+  instance_type = "${var.instance_type}"
+  source_ami    = "${var.source_ami}"
+  ssh_username  = "${var.ssh_username}"
+  subnet_id     = "${var.subnet_id}"
+
+  launch_block_device_mappings {
+    delete_on_termination = true
+    device_name           = "/dev/sda1"
+    volume_size           = 8
+    volume_type           = "gp2"
+  }
+}
+
+
+
+build {
+  sources = [
+    "source.amazon-ebs.webapp-ami",
+  ]
+
+  provisioner "file" {
+    source      = "../webapp"
+    destination = "/tmp/webapp"
+  }
+
+  provisioner "shell" {
+    inline = [
+      "set -ex",
+      "echo 'Updating package list'",
+      "sudo apt-get update -y",
+      "echo 'Upgrading packages'",
+      "sudo apt-get upgrade -y",
+      "echo 'Installing MySQL server'",
+      "sudo apt-get install -y mysql-server",
+      "echo 'Starting MySQL service'",
+      "sudo systemctl start mysql",
+      "echo 'Creating database ${var.db_name}'",
+      "sudo mysql -e \"CREATE DATABASE ${var.db_name};\"",
+      "echo 'Creating MySQL user ${var.db_user}'",
+      "sudo mysql -e \"CREATE USER '${var.db_user}'@'localhost' IDENTIFIED BY '${var.db_password}';\"",
+      "echo 'Granting privileges to user ${var.db_user}'",
+      "sudo mysql -e \"GRANT ALL PRIVILEGES ON ${var.db_name}.* TO '${var.db_user}'@'localhost';\"",
+      "echo 'Flushing privileges'",
+      "sudo mysql -e \"FLUSH PRIVILEGES;\"",
+      "echo 'Installing unzip'",
+      "sudo apt-get install -y unzip",
+    ]
+  }
+
+  provisioner "shell" {
+    inline = [
+      "set -ex",
+      "echo 'Creating local user csye6225'",
+      "sudo groupadd csye6225",
+      "sudo useradd -m -g csye6225 -s /usr/sbin/nologin csye6225",
+      "echo 'Installing libmysqlclient-dev'",
+      "sudo apt-get install -y pkg-config libmysqlclient-dev",
+      "echo 'Installing Python3 and pip'",
+      "sudo apt install -y python3 python3-pip",
+      "echo 'Installing Python3 virtual environment'",
+      "sudo apt-get install -y python3-venv",
+      "echo 'Creating virtual environment at /opt/venv'",
+      "sudo python3 -m venv /opt/venv",
+      "echo 'Changing ownership of virtual environment directory...'",
+      "sudo chown -R $(whoami):$(whoami) /opt/venv",
+      "echo 'Activating virtual environment'",
+      ". /opt/venv/bin/activate",
+      "echo 'Installing Python packages'",
+      "/opt/venv/bin/pip install Flask Flask-SQLAlchemy SQLAlchemy mysqlclient Werkzeug pytest",
+      "echo 'Copying webapp contents to /opt/csye6225'",
+      "sudo mkdir -p /opt/csye6225",
+      "sudo cp -r /tmp/webapp/* /opt/csye6225/",
+      "echo 'Changing ownership of /opt/csye6225 directory...'",
+      "sudo chown -R $(whoami):$(whoami) /opt/csye6225"   
+    ]
+  }
+  provisioner "shell" {
+    inline = [
+      "sudo cp /tmp/webapp/packer/csye6225.service /etc/systemd/system/csye6225.service",
+      "sudo systemctl daemon-reload",
+      "sudo systemctl enable csye6225.service",
+      "sudo systemctl start csye6225.service"
+    ]
+  }
+}
