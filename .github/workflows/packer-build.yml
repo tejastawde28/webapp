@@ -42,12 +42,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Verify GitHub Secrets
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
         run: |
-          if [[ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" || -z "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]]; then
+          if [[ -z "$AWS_ACCESS_KEY_ID" || -z "$AWS_SECRET_ACCESS_KEY" ]]; then
             echo "❌ AWS credentials are missing in GitHub Secrets!"
             exit 1
           fi
-          if [[ -z "${{ secrets.GCP_CREDENTIALS }}" ]]; then
+          if [[ -z "$GCP_CREDENTIALS" ]]; then
             echo "❌ GCP credentials are missing in GitHub Secrets!"
             exit 1
           fi
