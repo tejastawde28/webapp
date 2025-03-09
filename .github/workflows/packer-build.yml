@@ -47,7 +47,7 @@ jobs:
             echo "❌ AWS credentials are missing in GitHub Secrets!"
             exit 1
           fi
-          if [[ -z "${{ secrets.GCP_CREDENTIALS }}" || -z "${{ secrets.GCP_PROJECT_ID }}" ]]; then
+          if [[ -z "${{ secrets.GCP_CREDENTIALS }}" ]]; then
             echo "❌ GCP credentials are missing in GitHub Secrets!"
             exit 1
           fi
