@@ -47,6 +47,10 @@ jobs:
             echo "❌ AWS credentials are missing in GitHub Secrets!"
             exit 1
           fi
+          if [[ -z "${{ secrets.GCP_CREDENTIALS }}" || -z "${{ secrets.GCP_PROJECT_ID }}" ]]; then
+            echo "❌ GCP credentials are missing in GitHub Secrets!"
+            exit 1
+          fi
 
       - name: Configure AWS Credentials
         env:
@@ -82,8 +86,9 @@ jobs:
           PACKER_LOG: 1
           PACKER_LOG_PATH: "packer.log"
         run: |
+          echo "${{ secrets.GCP_CREDENTIALS }}" > /tmp/gcp-credentials.json
           packer init packer/webapp.pkr.hcl
-          packer build -var "db_password=${{ secrets.DB_PASSWORD }}" packer/webapp.pkr.hcl
+          packer build -var "gcp_credentials_file=/tmp/gcp-credentials.json" -var "db_password=${{ secrets.DB_PASSWORD }}" packer/webapp.pkr.hcl
 
       - name: Upload Packer Logs
         if: always()

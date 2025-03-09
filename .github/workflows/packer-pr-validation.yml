@@ -29,11 +29,12 @@ jobs:
       - name: Run packer validate
         id: packer-validate
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ vars.AWS_REGION }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          GCP_CREDENTIALS_FILE: ${{ secrets.GCP_CREDENTIALS_FILE }}
         run: |
           export PACKER_LOG=1
           packer init packer/webapp.pkr.hcl
-          packer validate -var "db_password=${{ secrets.DB_PASSWORD }}" packer/webapp.pkr.hcl || (echo "Packer validation failed, please fix the errors." && exit 1)
+          packer validate -var "db_password=${{ secrets.DB_PASSWORD }}" -var "gcp_credentials_file=${{ secrets.GCP_CREDENTIALS_FILE }}" packer/webapp.pkr.hcl || (echo "Packer validation failed, please fix the errors." && exit 1)
