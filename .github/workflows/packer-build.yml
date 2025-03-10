@@ -87,11 +87,12 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ vars.AWS_REGION }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
           PACKER_LOG: 1
           PACKER_LOG_PATH: "packer.log"
         run: |
-          echo "${{ secrets.GCP_CREDENTIALS }}" > /tmp/gcp-credentials.json
+          echo '${{ secrets.GCP_CREDENTIALS }}' > /tmp/gcp-credentials.json
           packer init packer/webapp.pkr.hcl
           packer build -var "gcp_credentials_file=/tmp/gcp-credentials.json" -var "db_password=${{ secrets.DB_PASSWORD }}" packer/webapp.pkr.hcl
 

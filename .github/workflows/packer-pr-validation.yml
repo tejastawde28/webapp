@@ -33,8 +33,9 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ vars.AWS_REGION }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          GCP_CREDENTIALS_FILE: ${{ secrets.GCP_CREDENTIALS_FILE }}
+          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
         run: |
           export PACKER_LOG=1
+          echo '${{ secrets.GCP_CREDENTIALS }}' > /tmp/gcp-credentials.json
           packer init packer/webapp.pkr.hcl
-          packer validate -var "db_password=${{ secrets.DB_PASSWORD }}" -var "gcp_credentials_file=${{ secrets.GCP_CREDENTIALS_FILE }}" packer/webapp.pkr.hcl || (echo "Packer validation failed, please fix the errors." && exit 1)
+          packer validate -var "db_password=${{ secrets.DB_PASSWORD }}" -var "gcp_credentials_file=/tmp/gcp-credentials.json" packer/webapp.pkr.hcl || (echo "Packer validation failed, please fix the errors." && exit 1)

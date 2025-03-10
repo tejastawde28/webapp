@@ -82,7 +82,7 @@ variable "gcp_zone" {
 
 variable "gcp_machine_type" {
   type    = string
-  default = "n1-standard-1"
+  default = "e2-medium"
 }
 
 variable "gcp_source_image" {
