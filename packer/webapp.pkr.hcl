@@ -70,6 +70,11 @@ variable "gcp_project_id" {
   default = "devproject-452020"
 }
 
+variable "demo_gcp_project_id" {
+  type    = string
+  default = "demoproject-452122"
+}
+
 variable "gcp_region" {
   type    = string
   default = "us-central1"
@@ -247,6 +252,18 @@ build {
       "sudo systemctl enable csye6225.service",
       "echo 'Starting csye6225.service'",
       "sudo systemctl start csye6225.service"
+    ]
+  }
+  post-processor "shell-local" {
+    only = [
+      "googlecompute.webapp-image",
+    ]
+    inline = [
+      "gcloud compute images create \"csye6225-webapp-demo\" \\",
+      "  --source-image=\"${var.gcp_image_name}\" \\",
+      "  --source-image-project=${var.gcp_project_id} \\",
+      "  --project=${var.demo_gcp_project_id} \\",
+      "  --description='Copied from DEV project'",
     ]
   }
 }
