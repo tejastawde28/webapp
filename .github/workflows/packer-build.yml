@@ -128,13 +128,13 @@ jobs:
 
       - name: Copy GCP Image to Demo Project
         env:
-          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-          GCP_DEMO_PROJECT_ID: ${{ secrets.GCP_DEMO_PROJECT_ID }}
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          GCP_DEMO_PROJECT_ID: ${{ vars.GCP_DEMO_PROJECT_ID }}
         run: |
           gcloud compute images create "csye6225-webapp-demo" \
             --source-image="${{ env.IMAGE_NAME }}" \
-            --source-image-project="${{ secrets.GCP_PROJECT_ID }}" \
-            --project="${{ secrets.GCP_DEMO_PROJECT_ID }}" \
+            --source-image-project="${{ vars.GCP_PROJECT_ID }}" \
+            --project="${{ vars.GCP_DEMO_PROJECT_ID }}" \
             --description="Copied from DEV project"
 
       - name: Upload Packer Logs
