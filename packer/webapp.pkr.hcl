@@ -254,16 +254,4 @@ build {
       "sudo systemctl start csye6225.service"
     ]
   }
-  post-processor "shell-local" {
-    only = [
-      "googlecompute.webapp-image",
-    ]
-    inline = [
-      "gcloud compute images create \"csye6225-webapp-demo\" \\",
-      "  --source-image=\"${var.gcp_image_name}\" \\",
-      "  --source-image-project=${var.gcp_project_id} \\",
-      "  --project=${var.demo_gcp_project_id} \\",
-      "  --description='Copied from DEV project'",
-    ]
-  }
 }

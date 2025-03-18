@@ -1,4 +1,4 @@
-name: webapp-pr-check
+name: Raised PR Checks
 
 on:
   pull_request:
@@ -8,6 +8,7 @@ on:
 
 jobs:
   test:
+    name: Run Python Integration Tests
     runs-on: ubuntu-latest
 
     steps:
