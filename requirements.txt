@@ -4,3 +4,4 @@ SQLAlchemy
 mysqlclient
 Werkzeug
 pytest
+boto3
