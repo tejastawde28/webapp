@@ -4,10 +4,10 @@ packer {
       version = ">= 1.0.0, < 2.0.0"
       source  = "github.com/hashicorp/amazon"
     }
-    googlecompute = {
-      source  = "github.com/hashicorp/googlecompute"
-      version = "~> 1"
-    }
+    # googlecompute = {
+    #   source  = "github.com/hashicorp/googlecompute"
+    #   version = "~> 1"
+    # }
   }
 }
 
@@ -41,19 +41,19 @@ variable "ssh_username" {
   default = "ubuntu"
 }
 
-variable "db_name" {
-  type    = string
-  default = "webapp"
-}
+# variable "db_name" {
+#   type    = string
+#   default = "webapp"
+# }
 
-variable "db_user" {
-  type    = string
-  default = "tejas"
-}
+# variable "db_user" {
+#   type    = string
+#   default = "tejas"
+# }
 
-variable "db_password" {
-  type = string
-}
+# variable "db_password" {
+#   type = string
+# }
 
 variable "dev_account_id" {
   type    = string
@@ -65,65 +65,65 @@ variable "demo_account_id" {
   default = "980921734991"
 }
 
-variable "gcp_project_id" {
-  type    = string
-  default = "devproject-452020"
-}
+# variable "gcp_project_id" {
+#   type    = string
+#   default = "devproject-452020"
+# }
 
-variable "demo_gcp_project_id" {
-  type    = string
-  default = "demoproject-452122"
-}
+# variable "demo_gcp_project_id" {
+#   type    = string
+#   default = "demoproject-452122"
+# }
 
-variable "gcp_region" {
-  type    = string
-  default = "us-central1"
-}
+# variable "gcp_region" {
+#   type    = string
+#   default = "us-central1"
+# }
 
-variable "gcp_zone" {
-  type    = string
-  default = "us-central1-a"
-}
+# variable "gcp_zone" {
+#   type    = string
+#   default = "us-central1-a"
+# }
 
-variable "gcp_machine_type" {
-  type    = string
-  default = "e2-medium"
-}
+# variable "gcp_machine_type" {
+#   type    = string
+#   default = "e2-medium"
+# }
 
-variable "gcp_source_image" {
-  type    = string
-  default = "ubuntu-2404-noble-amd64-v20250214"
-}
+# variable "gcp_source_image" {
+#   type    = string
+#   default = "ubuntu-2404-noble-amd64-v20250214"
+# }
 
-variable "gcp_source_image_family" {
-  type    = string
-  default = "ubuntu-2404-noble-amd64"
-}
+# variable "gcp_source_image_family" {
+#   type    = string
+#   default = "ubuntu-2404-noble-amd64"
+# }
 
 
-variable "gcp_image_name" {
-  type    = string
-  default = "csye6225-webapp-gcp"
-}
+# variable "gcp_image_name" {
+#   type    = string
+#   default = "csye6225-webapp-gcp"
+# }
 
-variable "gcp_image_family" {
-  type    = string
-  default = "gcp-webapp-image"
-}
+# variable "gcp_image_family" {
+#   type    = string
+#   default = "gcp-webapp-image"
+# }
 
-variable "gcp_disk_type" {
-  type    = string
-  default = "pd-standard"
-}
+# variable "gcp_disk_type" {
+#   type    = string
+#   default = "pd-standard"
+# }
 
-variable "gcp_network" {
-  type    = string
-  default = "default"
-}
+# variable "gcp_network" {
+#   type    = string
+#   default = "default"
+# }
 
-variable "gcp_credentials_file" {
-  type = string
-}
+# variable "gcp_credentials_file" {
+#   type = string
+# }
 
 source "amazon-ebs" "webapp-ami" {
   profile         = "${var.aws_profile}"
@@ -154,30 +154,30 @@ source "amazon-ebs" "webapp-ami" {
 }
 
 
-source "googlecompute" "webapp-image" {
-  project_id              = "${var.gcp_project_id}"
-  source_image            = "${var.gcp_source_image}"
-  source_image_family     = "${var.gcp_source_image_family}"
-  credentials_file        = "${var.gcp_credentials_file}"
-  region                  = "${var.gcp_region}"
-  zone                    = "${var.gcp_zone}"
-  machine_type            = "${var.gcp_machine_type}"
-  disk_size               = 10
-  disk_type               = "${var.gcp_disk_type}"
-  network                 = "${var.gcp_network}"
-  tags                    = ["csye6225"]
-  image_name              = "${var.gcp_image_name}"
-  image_family            = "${var.gcp_image_family}"
-  image_description       = "WebApp Ubuntu 24.04 server image"
-  image_storage_locations = ["us"]
-  ssh_username            = "${var.ssh_username}"
-}
+# source "googlecompute" "webapp-image" {
+#   project_id              = "${var.gcp_project_id}"
+#   source_image            = "${var.gcp_source_image}"
+#   source_image_family     = "${var.gcp_source_image_family}"
+#   credentials_file        = "${var.gcp_credentials_file}"
+#   region                  = "${var.gcp_region}"
+#   zone                    = "${var.gcp_zone}"
+#   machine_type            = "${var.gcp_machine_type}"
+#   disk_size               = 10
+#   disk_type               = "${var.gcp_disk_type}"
+#   network                 = "${var.gcp_network}"
+#   tags                    = ["csye6225"]
+#   image_name              = "${var.gcp_image_name}"
+#   image_family            = "${var.gcp_image_family}"
+#   image_description       = "WebApp Ubuntu 24.04 server image"
+#   image_storage_locations = ["us"]
+#   ssh_username            = "${var.ssh_username}"
+# }
 
 
 build {
   sources = [
     "source.amazon-ebs.webapp-ami",
-    "source.googlecompute.webapp-image",
+    # "source.googlecompute.webapp-image",
   ]
 
   provisioner "file" {
@@ -192,20 +192,20 @@ build {
       "sudo apt-get update -y",
       "echo 'Upgrading packages'",
       "sudo apt-get upgrade -y",
-      "echo 'Installing MySQL server'",
-      "sudo apt-get install -y mysql-server",
-      "echo 'Starting MySQL service'",
-      "sudo systemctl start mysql",
-      "echo 'Creating database ${var.db_name}'",
-      "sudo mysql -e \"CREATE DATABASE ${var.db_name};\"",
-      "echo 'Creating MySQL user ${var.db_user}'",
-      "sudo mysql -e \"CREATE USER '${var.db_user}'@'localhost' IDENTIFIED BY '${var.db_password}';\"",
-      "echo 'Granting privileges to user ${var.db_user}'",
-      "sudo mysql -e \"GRANT ALL PRIVILEGES ON ${var.db_name}.* TO '${var.db_user}'@'localhost';\"",
-      "echo 'Flushing privileges'",
-      "sudo mysql -e \"FLUSH PRIVILEGES;\"",
-      "echo 'Installing unzip'",
-      "sudo apt-get install -y unzip",
+      # "echo 'Installing MySQL server'",
+      # "sudo apt-get install -y mysql-server",
+      # "echo 'Starting MySQL service'",
+      # "sudo systemctl start mysql",
+      # "echo 'Creating database ${var.db_name}'",
+      # "sudo mysql -e \"CREATE DATABASE ${var.db_name};\"",
+      # "echo 'Creating MySQL user ${var.db_user}'",
+      # "sudo mysql -e \"CREATE USER '${var.db_user}'@'localhost' IDENTIFIED BY '${var.db_password}';\"",
+      # "echo 'Granting privileges to user ${var.db_user}'",
+      # "sudo mysql -e \"GRANT ALL PRIVILEGES ON ${var.db_name}.* TO '${var.db_user}'@'localhost';\"",
+      # "echo 'Flushing privileges'",
+      # "sudo mysql -e \"FLUSH PRIVILEGES;\"",
+      # "echo 'Installing unzip'",
+      # "sudo apt-get install -y unzip",
     ]
   }
 
@@ -228,7 +228,7 @@ build {
       "echo 'Activating virtual environment'",
       ". /opt/venv/bin/activate",
       "echo 'Installing Python packages'",
-      "/opt/venv/bin/pip install Flask Flask-SQLAlchemy SQLAlchemy mysqlclient Werkzeug pytest",
+      "/opt/venv/bin/pip install Flask Flask-SQLAlchemy SQLAlchemy mysqlclient Werkzeug pytest boto3",
       "echo 'Copying webapp contents to /opt/csye6225'",
       "sudo mkdir -p /opt/csye6225/webapp",
       "sudo cp -r /tmp/webapp/* /opt/csye6225/webapp/",
@@ -239,19 +239,19 @@ build {
   provisioner "shell" {
     inline = [
       "set -ex",
-      "echo 'Setting environment variables in /etc/environment'",
-      "echo 'DB_USERNAME=${var.db_user}' | sudo tee -a /etc/environment",
-      "echo 'DB_PASSWORD=${var.db_password}' | sudo tee -a /etc/environment",
-      "echo 'DB_NAME=${var.db_name}' | sudo tee -a /etc/environment",
-      ". /etc/environment",
+      # "echo 'Setting environment variables in /etc/environment'",
+      # "echo 'DB_USERNAME=${var.db_user}' | sudo tee -a /etc/environment",
+      # "echo 'DB_PASSWORD=${var.db_password}' | sudo tee -a /etc/environment",
+      # "echo 'DB_NAME=${var.db_name}' | sudo tee -a /etc/environment",
+      # ". /etc/environment",
       "echo 'Creating systemd service file'",
       "sudo cp /tmp/webapp/csye6225.service /etc/systemd/system/csye6225.service",
       "echo 'Reloading systemd daemon'",
       "sudo systemctl daemon-reload",
       "echo 'Enabling csye6225.service'",
       "sudo systemctl enable csye6225.service",
-      "echo 'Starting csye6225.service'",
-      "sudo systemctl start csye6225.service"
+      # "echo 'Starting csye6225.service'",
+      # "sudo systemctl start csye6225.service"
     ]
   }
 }

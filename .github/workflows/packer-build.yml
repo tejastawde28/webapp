@@ -46,21 +46,21 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
-          GCP_DEMO_CREDENTIALS: ${{ secrets.GCP_DEMO_CREDENTIALS }}
+          # GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+          # GCP_DEMO_CREDENTIALS: ${{ secrets.GCP_DEMO_CREDENTIALS }}
         run: |
           if [[ -z "$AWS_ACCESS_KEY_ID" || -z "$AWS_SECRET_ACCESS_KEY" ]]; then
             echo "❌ AWS credentials are missing in GitHub Secrets!"
             exit 1
           fi
-          if [[ -z "$GCP_CREDENTIALS" ]]; then
-            echo "❌ GCP credentials are missing in GitHub Secrets!"
-            exit 1
-          fi
-          if [[ -z "$GCP_DEMO_CREDENTIALS" ]]; then
-            echo "❌ GCP demo credentials are missing in GitHub Secrets!"
-            exit 1
-          fi
+          # if [[ -z "$GCP_CREDENTIALS" ]]; then
+          #   echo "❌ GCP credentials are missing in GitHub Secrets!"
+          #   exit 1
+          # fi
+          # if [[ -z "$GCP_DEMO_CREDENTIALS" ]]; then
+          #   echo "❌ GCP demo credentials are missing in GitHub Secrets!"
+          #   exit 1
+          # fi
 
       - name: Configure AWS Credentials
         env:
@@ -88,54 +88,53 @@ jobs:
           PACKER_LOG_PATH: "packer.log"
         run: echo "Packer logging enabled."
 
-      - name: Authenticate gcloud dev
-        env:
-          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
-        run: |
-          echo '${{ secrets.GCP_CREDENTIALS }}' > gcloud-credentials-dev.json
-          gcloud auth activate-service-account --key-file=gcloud-credentials-dev.json
+      # - name: Authenticate gcloud dev
+      #   env:
+      #     GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+      #   run: |
+      #     echo '${{ secrets.GCP_CREDENTIALS }}' > gcloud-credentials-dev.json
+      #     gcloud auth activate-service-account --key-file=gcloud-credentials-dev.json
 
-      - name: Authenticate gcloud demo
-        env:
-          GCP_DEMO_CREDENTIALS: ${{ secrets.GCP_DEMO_CREDENTIALS }}
-        run: |
-          echo '${{ secrets.GCP_DEMO_CREDENTIALS }}' > /tmp/demo-credentials.json
-          gcloud auth activate-service-account --key-file=/tmp/demo-credentials.json
+      # - name: Authenticate gcloud demo
+      #   env:
+      #     GCP_DEMO_CREDENTIALS: ${{ secrets.GCP_DEMO_CREDENTIALS }}
+      #   run: |
+      #     echo '${{ secrets.GCP_DEMO_CREDENTIALS }}' > /tmp/demo-credentials.json
+      #     gcloud auth activate-service-account --key-file=/tmp/demo-credentials.json
 
-      - name: Debug gcloud Auth
-        run: |
-          gcloud auth list
-          gcloud config list project
+      # - name: Debug gcloud Auth
+      #   run: |
+      #     gcloud auth list
+      #     gcloud config list project
 
       - name: Build Image with Packer and Capture Output
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ vars.AWS_REGION }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+          # DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          # GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
           PACKER_LOG: 1
           PACKER_LOG_PATH: "packer.log"
         run: |
-          echo '${{ secrets.GCP_CREDENTIALS }}' > /tmp/gcp-credentials.json
           packer init packer/webapp.pkr.hcl
-          packer build -var "gcp_credentials_file=/tmp/gcp-credentials.json" -var "db_password=${{ secrets.DB_PASSWORD }}" packer/webapp.pkr.hcl | tee packer-output.log
+          packer build packer/webapp.pkr.hcl
 
-      - name: Extract GCP Image Name
-        run: |
-          IMAGE_NAME=$(grep "googlecompute.webapp-image: A disk image was created in the 'devproject-452020' project:" packer-output.log | awk '{print $NF}')
-          echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
+      # - name: Extract GCP Image Name
+      #   run: |
+      #     IMAGE_NAME=$(grep "googlecompute.webapp-image: A disk image was created in the 'devproject-452020' project:" packer-output.log | awk '{print $NF}')
+      #     echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
 
-      - name: Copy GCP Image to Demo Project
-        env:
-          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-          GCP_DEMO_PROJECT_ID: ${{ vars.GCP_DEMO_PROJECT_ID }}
-        run: |
-          gcloud compute images create "csye6225-webapp-demo" \
-            --source-image="${{ env.IMAGE_NAME }}" \
-            --source-image-project="${{ vars.GCP_PROJECT_ID }}" \
-            --project="${{ vars.GCP_DEMO_PROJECT_ID }}" \
-            --description="Copied from DEV project"
+      # - name: Copy GCP Image to Demo Project
+      #   env:
+      #     GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      #     GCP_DEMO_PROJECT_ID: ${{ vars.GCP_DEMO_PROJECT_ID }}
+      #   run: |
+      #     gcloud compute images create "csye6225-webapp-demo" \
+      #       --source-image="${{ env.IMAGE_NAME }}" \
+      #       --source-image-project="${{ vars.GCP_PROJECT_ID }}" \
+      #       --project="${{ vars.GCP_DEMO_PROJECT_ID }}" \
+      #       --description="Copied from DEV project"
 
       - name: Upload Packer Logs
         if: always()
