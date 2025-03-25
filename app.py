@@ -94,15 +94,46 @@ def health_check():
 
 @app.route('/v1/file', methods=['POST'])
 def upload_file():
+    if request.method != 'POST':
+        if request.method in ['GET', 'DELETE']:
+            response = app.response_class(
+                response='',
+                status=400,
+                headers={
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'X-Content-Type-Options': 'nosniff'
+                }
+            )
+        else:
+            return method_not_allowed(None)
     # Check if the request has a file
     if 'file' not in request.files:
-        return jsonify({"error": "No file provided"}), 400
+        response = app.response_class(
+            response='',
+            status=400,
+            headers = {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'X-Content-Type-Options': 'nosniff'
+            }
+        )
+        return response
     
     file = request.files['file']
     
     # Check if file is empty
     if file.filename == '':
-        return jsonify({"error": "No file selected"}), 400
+        response = app.response_class(
+            response='',
+            status=400,
+            headers = {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'X-Content-Type-Options': 'nosniff'
+            }
+        )
+        return response
     
     try:
         # Generate secure filename and unique ID
@@ -150,16 +181,36 @@ def upload_file():
     except Exception as e:
         print(f"Error uploading file: {e}")
         db.session.rollback()
-        return jsonify({"error": "Failed to upload file"}), 400
+        response = app.response_class(
+            response='',
+            status=400,
+            headers = {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'X-Content-Type-Options': 'nosniff'
+            }
+        )
+        return response
 
 @app.route('/v1/file/<string:id>', methods=['GET'])
 def get_file(id):
+    if request.method != 'GET':
+        return method_not_allowed(None)
     try:
         # Find file in database
         file = File.query.get(id)
         
         if not file:
-            return jsonify({"error": "File not found"}), 404
+            response = app.response_class(
+                response='',
+                status=400,
+                headers = {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'X-Content-Type-Options': 'nosniff'
+                }
+            )
+            return response
         
         # Return file metadata
         response = {
@@ -173,16 +224,36 @@ def get_file(id):
         
     except Exception as e:
         print(f"Error retrieving file: {e}")
-        return jsonify({"error": "Failed to retrieve file"}), 500
+        response = app.response_class(
+            response='',
+            status=500,
+            headers = {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'X-Content-Type-Options': 'nosniff'
+            }
+        )
+        return response
 
 @app.route('/v1/file/<string:id>', methods=['DELETE'])
 def delete_file(id):
+    if request.method != 'DELETE':
+        return method_not_allowed(None)
     try:
         # Find file in database
         file = File.query.get(id)
         
         if not file:
-            return jsonify({"error": "File not found"}), 404
+            response = app.response_class(
+                response='',
+                status=404,
+                headers = {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'X-Content-Type-Options': 'nosniff'
+                }
+            )
+            return response
         
         # Delete from S3
         s3_client = get_s3_client()
@@ -207,7 +278,16 @@ def delete_file(id):
     except Exception as e:
         print(f"Error deleting file: {e}")
         db.session.rollback()
-        return jsonify({"error": "Failed to delete file"}), 500
+        response = app.response_class(
+            response='',
+            status=500,
+            headers = {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'X-Content-Type-Options': 'nosniff'
+            }
+        )
+        return response
 
 @app.errorhandler(405)
 def method_not_allowed(e):
