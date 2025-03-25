@@ -209,6 +209,27 @@ build {
     ]
   }
 
+  # Install CloudWatch agent first
+  provisioner "shell" {
+    inline = [
+      "set -ex",
+      "echo 'Installing CloudWatch agent'",
+      "sudo apt-get install -y wget",
+      "wget https://amazoncloudwatch-agent.s3.amazonaws.com/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb",
+      "sudo dpkg -i amazon-cloudwatch-agent.deb",
+      "sudo mkdir -p /opt/aws/amazon-cloudwatch-agent/etc",
+      "sudo cp /tmp/webapp/cloudwatch-config.json /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json",
+      "sudo chown root:root /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json",
+      "sudo chmod 644 /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json",
+      "echo 'Creating empty log file'",
+      "sudo touch /var/log/csye6225.log",
+      "sudo chmod 666 /var/log/csye6225.log",
+      "echo 'Enabling CloudWatch agent to start on boot'",
+      "sudo systemctl enable amazon-cloudwatch-agent",
+      "echo 'CloudWatch agent configured successfully'",
+    ]
+  }
+
   provisioner "shell" {
     inline = [
       "set -ex",
@@ -228,12 +249,15 @@ build {
       "echo 'Activating virtual environment'",
       ". /opt/venv/bin/activate",
       "echo 'Installing Python packages'",
-      "/opt/venv/bin/pip install Flask Flask-SQLAlchemy SQLAlchemy mysqlclient Werkzeug pytest boto3",
+      "/opt/venv/bin/pip install Flask Flask-SQLAlchemy SQLAlchemy mysqlclient Werkzeug pytest boto3 watchtower statsd",
       "echo 'Copying webapp contents to /opt/csye6225'",
       "sudo mkdir -p /opt/csye6225/webapp",
       "sudo cp -r /tmp/webapp/* /opt/csye6225/webapp/",
       "echo 'Changing ownership of /opt/csye6225/webapp directory...'",
-      "sudo chown -R $(whoami):$(whoami) /opt/csye6225/webapp"
+      "sudo chown -R $(whoami):$(whoami) /opt/csye6225/webapp",
+      "echo 'Adding appropriate permissions to directories'",
+      "sudo chmod -R 755 /opt/venv",
+      "sudo chmod -R 755 /opt/csye6225/webapp",
     ]
   }
   provisioner "shell" {

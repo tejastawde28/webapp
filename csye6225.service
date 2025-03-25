@@ -12,8 +12,8 @@ EnvironmentFile=/etc/environment
 Environment="PATH=/opt/venv/bin:$PATH"
 Restart=always
 RestartSec=3
-StandardOutput=syslog
-StandardError=syslog
+StandardOutput=append:/var/log/csye6225.log
+StandardError=append:/var/log/csye6225.log
 SyslogIdentifier=csye6225
 
 [Install]
