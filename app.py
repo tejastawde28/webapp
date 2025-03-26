@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, send_file
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 import uuid
 import boto3
@@ -12,11 +12,21 @@ from werkzeug.utils import secure_filename
 from datetime import date
 from statsd import StatsClient
 
+# Set up separate logging for Werkzeug (server logs)
+werkzeug_logger = logging.getLogger('werkzeug')
+werkzeug_logger.setLevel(logging.INFO)
+werkzeug_logger.handlers.clear()
+
+werkzeug_file_handler = logging.FileHandler('/var/log/werkzeug.log' if not os.getenv('TESTING') else 'werkzeug.log')
+werkzeug_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+werkzeug_file_handler.setFormatter(werkzeug_formatter)
+werkzeug_logger.addHandler(werkzeug_file_handler)
+
 # Custom JSON formatter for logs
 class JsonFormatter(logging.Formatter):
     def format(self, record):
         log_record = {
-            "timestamp": datetime.now(datetime.timezone.utc).isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": record.levelname,
             "message": record.getMessage(),
             "logger": record.name,
@@ -52,12 +62,12 @@ db = SQLAlchemy(app)
 log_group = os.getenv('CLOUDWATCH_LOG_GROUP', 'webapp-logs')
 log_stream = os.getenv('CLOUDWATCH_LOG_STREAM', 'app-logs')
 
-# Set up logging
+# Set up application logging
 logger = logging.getLogger('webapp')
 logger.setLevel(logging.INFO)
 json_formatter = JsonFormatter()
 
-# Add CloudWatch handler
+# Add CloudWatch handler for application logs only
 if not os.getenv('TESTING') == 'True':
     try:
         # Create CloudWatch handler with JSON formatter
@@ -68,6 +78,11 @@ if not os.getenv('TESTING') == 'True':
         )
         cloudwatch_handler.setFormatter(json_formatter)
         logger.addHandler(cloudwatch_handler)
+        
+        # Also add file handler for application logs
+        app_file_handler = logging.FileHandler('/var/log/csye6225.log')
+        app_file_handler.setFormatter(json_formatter)
+        logger.addHandler(app_file_handler)
         
         # Also add console handler for local debugging
         console_handler = logging.StreamHandler()
