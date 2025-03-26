@@ -6,10 +6,32 @@ import uuid
 import boto3
 import time
 import logging
+import json
 import watchtower
 from werkzeug.utils import secure_filename
 from datetime import date
 from statsd import StatsClient
+
+# Custom JSON formatter for logs
+class JsonFormatter(logging.Formatter):
+    def format(self, record):
+        log_record = {
+            "timestamp": datetime.now(datetime.timezone.utc).isoformat(),
+            "level": record.levelname,
+            "message": record.getMessage(),
+            "logger": record.name,
+            "path": getattr(record, 'path', ''),
+            "method": getattr(record, 'method', ''),
+            "status_code": getattr(record, 'status_code', ''),
+            "remote_addr": getattr(record, 'remote_addr', ''),
+            "duration_ms": getattr(record, 'duration_ms', ''),
+            "operation": getattr(record, 'operation', '')
+        }
+        
+        if record.exc_info:
+            log_record['exception'] = self.formatException(record.exc_info)
+            
+        return json.dumps(log_record)
 
 # Initialize StatsClient for metrics
 statsd_client = StatsClient(host='localhost', port=8125, prefix='webapp')
@@ -33,28 +55,34 @@ log_stream = os.getenv('CLOUDWATCH_LOG_STREAM', 'app-logs')
 # Set up logging
 logger = logging.getLogger('webapp')
 logger.setLevel(logging.INFO)
+json_formatter = JsonFormatter()
 
 # Add CloudWatch handler
 if not os.getenv('TESTING') == 'True':
     try:
+        # Create CloudWatch handler with JSON formatter
         cloudwatch_handler = watchtower.CloudWatchLogHandler(
             log_group=log_group,
             stream_name=log_stream,
             create_log_group=True
         )
+        cloudwatch_handler.setFormatter(json_formatter)
         logger.addHandler(cloudwatch_handler)
         
         # Also add console handler for local debugging
         console_handler = logging.StreamHandler()
         console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(json_formatter)
         logger.addHandler(console_handler)
         
-        logger.info("CloudWatch logging initialized successfully")
+        extra = {'path': '', 'method': '', 'remote_addr': ''}
+        logger.info("CloudWatch logging initialized successfully", extra=extra)
     except Exception as e:
         print(f"Failed to initialize CloudWatch logging: {e}")
         # Fallback to console logging
         console_handler = logging.StreamHandler()
         console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(json_formatter)
         logger.addHandler(console_handler)
 
 
@@ -83,12 +111,26 @@ def time_s3_operation(operation_name, func, *args, **kwargs):
         result = func(*args, **kwargs)
         duration = (time.time() - start_time) * 1000  # Convert to milliseconds
         statsd_client.timing(f's3.{operation_name}', duration)
-        logger.info(f"S3 operation {operation_name} completed in {duration:.2f}ms")
+        
+        extra = {
+            'operation': f's3.{operation_name}',
+            'duration_ms': f"{duration:.2f}",
+            'path': request.path if request else '',
+            'method': request.method if request else ''
+        }
+        logger.info(f"S3 operation {operation_name} completed", extra=extra)
         return result
     except Exception as e:
         duration = (time.time() - start_time) * 1000
         statsd_client.timing(f's3.{operation_name}.error', duration)
-        logger.error(f"S3 operation {operation_name} failed after {duration:.2f}ms: {e}", exc_info=True)
+        
+        extra = {
+            'operation': f's3.{operation_name}',
+            'duration_ms': f"{duration:.2f}",
+            'path': request.path if request else '',
+            'method': request.method if request else ''
+        }
+        logger.error(f"S3 operation {operation_name} failed: {str(e)}", exc_info=True, extra=extra)
         raise
 
 def time_db_operation(operation_name, func, *args, **kwargs):
@@ -98,31 +140,58 @@ def time_db_operation(operation_name, func, *args, **kwargs):
         result = func(*args, **kwargs)
         duration = (time.time() - start_time) * 1000  # Convert to milliseconds
         statsd_client.timing(f'db.{operation_name}', duration)
-        logger.info(f"Database operation {operation_name} completed in {duration:.2f}ms")
+        
+        extra = {
+            'operation': f'db.{operation_name}',
+            'duration_ms': f"{duration:.2f}",
+            'path': request.path if request else '',
+            'method': request.method if request else ''
+        }
+        logger.info(f"Database operation {operation_name} completed", extra=extra)
         return result
     except Exception as e:
         duration = (time.time() - start_time) * 1000
         statsd_client.timing(f'db.{operation_name}.error', duration)
-        logger.error(f"Database operation {operation_name} failed after {duration:.2f}ms: {e}", exc_info=True)
+        
+        extra = {
+            'operation': f'db.{operation_name}',
+            'duration_ms': f"{duration:.2f}",
+            'path': request.path if request else '',
+            'method': request.method if request else ''
+        }
+        logger.error(f"Database operation {operation_name} failed: {str(e)}", exc_info=True, extra=extra)
         raise
 
 def bootstrap_db():
     try:
         with app.app_context():
             db.create_all()
-            logger.info("Database initialized successfully")
+            extra = {'path': '', 'method': '', 'remote_addr': ''}
+            logger.info("Database initialized successfully", extra=extra)
     except Exception as e:
         error_msg = f"Exception occurred while creating database: {e}"
-        logger.error(error_msg, exc_info=True)
+        extra = {'path': '', 'method': '', 'remote_addr': ''}
+        logger.error(error_msg, exc_info=True, extra=extra)
         print(error_msg)
 
 @app.before_request
 def log_request_info():
-    logger.info(f"Request: {request.method} {request.path} from {request.remote_addr}")
+    extra = {
+        'path': request.path,
+        'method': request.method,
+        'remote_addr': request.remote_addr
+    }
+    logger.info(f"Request received", extra=extra)
 
 @app.after_request
 def log_response_info(response):
-    logger.info(f"Response: {response.status_code}")
+    extra = {
+        'path': request.path,
+        'method': request.method,
+        'remote_addr': request.remote_addr,
+        'status_code': response.status_code
+    }
+    logger.info(f"Response sent", extra=extra)
     return response
 
 @app.route('/healthz', methods=['GET'])
@@ -131,11 +200,21 @@ def health_check():
     statsd_client.incr('api.health_check')
     
     if request.method not in ['GET']:
-        logger.warning(f"Method not allowed: {request.method} for /healthz")
+        extra = {
+            'path': request.path,
+            'method': request.method,
+            'remote_addr': request.remote_addr
+        }
+        logger.warning(f"Method not allowed for health check endpoint", extra=extra)
         return method_not_allowed(None)
 
     if request.data or request.form or request.args:
-        logger.warning("Bad request: health check with parameters")
+        extra = {
+            'path': request.path,
+            'method': request.method,
+            'remote_addr': request.remote_addr
+        }
+        logger.warning("Bad request: health check with parameters", extra=extra)
         response = app.response_class(
             response='',
             status=400,
@@ -154,7 +233,14 @@ def health_check():
         new_check = HealthCheck()
         time_db_operation('health_check_insert', db.session.add, new_check)
         time_db_operation('health_check_commit', db.session.commit)
-        logger.info("Health check successful")
+        
+        extra = {
+            'path': request.path,
+            'method': request.method,
+            'remote_addr': request.remote_addr,
+            'duration_ms': f"{(time.time() - start_time) * 1000:.2f}"
+        }
+        logger.info("Health check successful", extra=extra)
 
         response = app.response_class(
             response='',
@@ -170,8 +256,15 @@ def health_check():
         return response
     
     except Exception as e:
-        error_msg = f"Health check failed: {e}"
-        logger.error(error_msg, exc_info=True)
+        duration = (time.time() - start_time) * 1000
+        extra = {
+            'path': request.path,
+            'method': request.method,
+            'remote_addr': request.remote_addr,
+            'duration_ms': f"{duration:.2f}"
+        }
+        logger.error(f"Health check failed: {str(e)}", exc_info=True, extra=extra)
+        
         response = app.response_class(
             response='',
             status=503,
@@ -181,7 +274,6 @@ def health_check():
                 'X-Content-Type-Options': 'nosniff'
             }
         )
-        duration = (time.time() - start_time) * 1000
         statsd_client.timing('api.health_check.time', duration)
         return response
 
@@ -192,7 +284,12 @@ def upload_file():
     
     if request.method != 'POST':
         if request.method in ['GET', 'DELETE']:
-            logger.warning(f"Invalid method {request.method} for upload endpoint")
+            extra = {
+                'path': request.path,
+                'method': request.method,
+                'remote_addr': request.remote_addr
+            }
+            logger.warning(f"Invalid method for upload endpoint", extra=extra)
             response = app.response_class(
                 response='',
                 status=400,
@@ -203,7 +300,12 @@ def upload_file():
                 }
             )
         else:
-            logger.warning(f"Method not allowed: {request.method} for upload endpoint")
+            extra = {
+                'path': request.path,
+                'method': request.method,
+                'remote_addr': request.remote_addr
+            }
+            logger.warning(f"Method not allowed for upload endpoint", extra=extra)
             return method_not_allowed(None)
         duration = (time.time() - start_time) * 1000
         statsd_client.timing('api.upload_file.time', duration)
@@ -211,7 +313,12 @@ def upload_file():
     
     # Check if the request has a file
     if 'file' not in request.files:
-        logger.warning("Upload attempt with no file provided")
+        extra = {
+            'path': request.path,
+            'method': request.method,
+            'remote_addr': request.remote_addr
+        }
+        logger.warning("Upload attempt with no file provided", extra=extra)
         response = app.response_class(
             response='',
             status=400,
@@ -229,7 +336,12 @@ def upload_file():
     
     # Check if file is empty
     if file.filename == '':
-        logger.warning("Upload attempt with empty filename")
+        extra = {
+            'path': request.path,
+            'method': request.method,
+            'remote_addr': request.remote_addr
+        }
+        logger.warning("Upload attempt with empty filename", extra=extra)
         response = app.response_class(
             response='',
             status=400,
@@ -247,7 +359,15 @@ def upload_file():
         # Generate secure filename and unique ID
         file_id = str(uuid.uuid4())
         filename = secure_filename(file.filename)
-        logger.info(f"Processing upload for file: {filename}, ID: {file_id}")
+        
+        extra = {
+            'path': request.path,
+            'method': request.method,
+            'remote_addr': request.remote_addr,
+            'file_id': file_id,
+            'file_name': filename
+        }
+        logger.info(f"Processing file upload", extra=extra)
         
         # Get S3 client and bucket name
         s3_client = get_s3_client()
@@ -281,15 +401,34 @@ def upload_file():
             "upload_date": new_file.upload_date.strftime("%Y-%m-%d")
         }
         
-        logger.info(f"File uploaded successfully: {file_id}")
         duration = (time.time() - start_time) * 1000
+        extra = {
+            'path': request.path,
+            'method': request.method,
+            'remote_addr': request.remote_addr,
+            'file_id': file_id,
+            'duration_ms': f"{duration:.2f}"
+        }
+        logger.info(f"File uploaded successfully", extra=extra)
+        
         statsd_client.timing('api.upload_file.time', duration)
         return jsonify(response), 201
         
     except Exception as e:
-        error_msg = f"Error uploading file: {e}"
-        logger.error(error_msg, exc_info=True)
-        time_db_operation('file_rollback', db.session.rollback)
+        duration = (time.time() - start_time) * 1000
+        extra = {
+            'path': request.path,
+            'method': request.method,
+            'remote_addr': request.remote_addr,
+            'duration_ms': f"{duration:.2f}"
+        }
+        logger.error(f"Error uploading file: {str(e)}", exc_info=True, extra=extra)
+        
+        try:
+            time_db_operation('file_rollback', db.session.rollback)
+        except:
+            pass
+            
         response = app.response_class(
             response='',
             status=400,
@@ -299,7 +438,6 @@ def upload_file():
                 'X-Content-Type-Options': 'nosniff'
             }
         )
-        duration = (time.time() - start_time) * 1000
         statsd_client.timing('api.upload_file.time', duration)
         return response
 
@@ -309,18 +447,38 @@ def get_file(id):
     statsd_client.incr('api.get_file')
     
     if request.method != 'GET':
-        logger.warning(f"Method not allowed: {request.method} for get file endpoint")
+        extra = {
+            'path': request.path,
+            'method': request.method,
+            'remote_addr': request.remote_addr,
+            'file_id': id
+        }
+        logger.warning(f"Method not allowed for get file endpoint", extra=extra)
         duration = (time.time() - start_time) * 1000
         statsd_client.timing('api.get_file.time', duration)
         return method_not_allowed(None)
     
     try:
         # Find file in database with timing
-        logger.info(f"Retrieving file with ID: {id}")
+        extra = {
+            'path': request.path,
+            'method': request.method,
+            'remote_addr': request.remote_addr,
+            'file_id': id
+        }
+        logger.info(f"Retrieving file", extra=extra)
+        
         file = time_db_operation('get_file', File.query.get, id)
         
         if not file:
-            logger.warning(f"File not found: {id}")
+            extra = {
+                'path': request.path,
+                'method': request.method,
+                'remote_addr': request.remote_addr,
+                'file_id': id
+            }
+            logger.warning(f"File not found", extra=extra)
+            
             response = app.response_class(
                 response='',
                 status=400,
@@ -342,14 +500,30 @@ def get_file(id):
             "upload_date": file.upload_date.strftime("%Y-%m-%d")
         }
         
-        logger.info(f"File retrieved successfully: {id}")
         duration = (time.time() - start_time) * 1000
+        extra = {
+            'path': request.path,
+            'method': request.method,
+            'remote_addr': request.remote_addr,
+            'file_id': id,
+            'duration_ms': f"{duration:.2f}"
+        }
+        logger.info(f"File retrieved successfully", extra=extra)
+        
         statsd_client.timing('api.get_file.time', duration)
         return jsonify(response), 200
         
     except Exception as e:
-        error_msg = f"Error retrieving file: {e}"
-        logger.error(error_msg, exc_info=True)
+        duration = (time.time() - start_time) * 1000
+        extra = {
+            'path': request.path,
+            'method': request.method,
+            'remote_addr': request.remote_addr,
+            'file_id': id,
+            'duration_ms': f"{duration:.2f}"
+        }
+        logger.error(f"Error retrieving file: {str(e)}", exc_info=True, extra=extra)
+        
         response = app.response_class(
             response='',
             status=500,
@@ -359,7 +533,6 @@ def get_file(id):
                 'X-Content-Type-Options': 'nosniff'
             }
         )
-        duration = (time.time() - start_time) * 1000
         statsd_client.timing('api.get_file.time', duration)
         return response
 
@@ -369,18 +542,39 @@ def delete_file(id):
     statsd_client.incr('api.delete_file')
     
     if request.method != 'DELETE':
-        logger.warning(f"Method not allowed: {request.method} for delete file endpoint")
+        extra = {
+            'path': request.path,
+            'method': request.method,
+            'remote_addr': request.remote_addr,
+            'file_id': id
+        }
+        logger.warning(f"Method not allowed for delete file endpoint", extra=extra)
+        
         duration = (time.time() - start_time) * 1000
         statsd_client.timing('api.delete_file.time', duration)
         return method_not_allowed(None)
     
     try:
         # Find file in database with timing
-        logger.info(f"Deleting file with ID: {id}")
+        extra = {
+            'path': request.path,
+            'method': request.method,
+            'remote_addr': request.remote_addr,
+            'file_id': id
+        }
+        logger.info(f"Deleting file", extra=extra)
+        
         file = time_db_operation('get_file_for_delete', File.query.get, id)
         
         if not file:
-            logger.warning(f"File not found for deletion: {id}")
+            extra = {
+                'path': request.path,
+                'method': request.method,
+                'remote_addr': request.remote_addr,
+                'file_id': id
+            }
+            logger.warning(f"File not found for deletion", extra=extra)
+            
             response = app.response_class(
                 response='',
                 status=404,
@@ -408,16 +602,36 @@ def delete_file(id):
         time_db_operation('file_delete', db.session.delete, file)
         time_db_operation('file_delete_commit', db.session.commit)
         
-        logger.info(f"File deleted successfully: {id}")
-        # Return success with no content
         duration = (time.time() - start_time) * 1000
+        extra = {
+            'path': request.path,
+            'method': request.method,
+            'remote_addr': request.remote_addr,
+            'file_id': id,
+            'duration_ms': f"{duration:.2f}"
+        }
+        logger.info(f"File deleted successfully", extra=extra)
+        
+        # Return success with no content
         statsd_client.timing('api.delete_file.time', duration)
         return '', 204
         
     except Exception as e:
-        error_msg = f"Error deleting file: {e}"
-        logger.error(error_msg, exc_info=True)
-        time_db_operation('file_delete_rollback', db.session.rollback)
+        duration = (time.time() - start_time) * 1000
+        extra = {
+            'path': request.path,
+            'method': request.method,
+            'remote_addr': request.remote_addr,
+            'file_id': id,
+            'duration_ms': f"{duration:.2f}"
+        }
+        logger.error(f"Error deleting file: {str(e)}", exc_info=True, extra=extra)
+        
+        try:
+            time_db_operation('file_delete_rollback', db.session.rollback)
+        except:
+            pass
+            
         response = app.response_class(
             response='',
             status=500,
@@ -427,13 +641,18 @@ def delete_file(id):
                 'X-Content-Type-Options': 'nosniff'
             }
         )
-        duration = (time.time() - start_time) * 1000
         statsd_client.timing('api.delete_file.time', duration)
         return response
 
 @app.errorhandler(405)
 def method_not_allowed(e):
-    logger.warning(f"Method not allowed: {request.method} {request.path}")
+    extra = {
+        'path': request.path,
+        'method': request.method,
+        'remote_addr': request.remote_addr
+    }
+    logger.warning(f"Method not allowed", extra=extra)
+    
     response = app.response_class(
         response='',
         status=405,
@@ -448,15 +667,24 @@ def method_not_allowed(e):
 @app.before_request
 def block_options_request():
     if request.method == 'OPTIONS':
-        logger.warning(f"OPTIONS request blocked: {request.path}")
+        extra = {
+            'path': request.path,
+            'method': request.method,
+            'remote_addr': request.remote_addr
+        }
+        logger.warning(f"OPTIONS request blocked", extra=extra)
+        
         return method_not_allowed(None)
 
 if __name__ == '__main__':
     try:
         bootstrap_db()
-        logger.info("Application starting up")
+        extra = {'path': '', 'method': '', 'remote_addr': ''}
+        logger.info("Application starting up", extra=extra)
+        
         app.run(debug=False, host='0.0.0.0')
     except Exception as e:
         error_msg = f"Exception occurred while starting application: {e}"
-        logger.error(error_msg, exc_info=True)
+        extra = {'path': '', 'method': '', 'remote_addr': ''}
+        logger.error(error_msg, exc_info=True, extra=extra)
         print(error_msg)
