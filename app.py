@@ -12,16 +12,6 @@ from werkzeug.utils import secure_filename
 from datetime import date
 from statsd import StatsClient
 
-# Set up separate logging for Werkzeug (server logs)
-werkzeug_logger = logging.getLogger('werkzeug')
-werkzeug_logger.setLevel(logging.INFO)
-werkzeug_logger.handlers.clear()
-
-werkzeug_file_handler = logging.FileHandler('/var/log/werkzeug.log' if not os.getenv('TESTING') else 'werkzeug.log')
-werkzeug_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-werkzeug_file_handler.setFormatter(werkzeug_formatter)
-werkzeug_logger.addHandler(werkzeug_file_handler)
-
 # Custom JSON formatter for logs
 class JsonFormatter(logging.Formatter):
     def format(self, record):
@@ -62,12 +52,12 @@ db = SQLAlchemy(app)
 log_group = os.getenv('CLOUDWATCH_LOG_GROUP', 'webapp-logs')
 log_stream = os.getenv('CLOUDWATCH_LOG_STREAM', 'app-logs')
 
-# Set up application logging
+# Set up logging
 logger = logging.getLogger('webapp')
 logger.setLevel(logging.INFO)
 json_formatter = JsonFormatter()
 
-# Add CloudWatch handler for application logs only
+# Add CloudWatch handler
 if not os.getenv('TESTING') == 'True':
     try:
         # Create CloudWatch handler with JSON formatter
