@@ -168,31 +168,31 @@ jobs:
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "New Launch Template Version: $NEW_VERSION"
 
-          - name: Get Auto Scaling Group Name
-          id: get_asg
-          run: |
-            # Try first to get it by exact name since we know it
-            ASG_NAME="webapp-asg"
+      - name: Get Auto Scaling Group Name
+        id: get_asg
+        run: |
+          # Try first to get it by exact name since we know it
+          ASG_NAME="webapp-asg"
+          
+          # Verify the ASG exists
+          ASG_CHECK=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names $ASG_NAME --query 'length(AutoScalingGroups)' --output text)
+          
+          if [ "$ASG_CHECK" -eq "0" ]; then
+            echo "ASG named 'webapp-asg' not found, trying to find by tags..."
             
-            # Verify the ASG exists
-            ASG_CHECK=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names $ASG_NAME --query 'length(AutoScalingGroups)' --output text)
+            # Fall back to original logic of searching by tags
+            ASG_NAME=$(aws autoscaling describe-auto-scaling-groups \
+              --query 'AutoScalingGroups[?contains(Tags[?Key==`Name`].Value, `webapp-asg`)].AutoScalingGroupName' \
+              --output text)
             
-            if [ "$ASG_CHECK" -eq "0" ]; then
-              echo "ASG named 'webapp-asg' not found, trying to find by tags..."
-              
-              # Fall back to original logic of searching by tags
-              ASG_NAME=$(aws autoscaling describe-auto-scaling-groups \
-                --query 'AutoScalingGroups[?contains(Tags[?Key==`Name`].Value, `webapp-asg`)].AutoScalingGroupName' \
-                --output text)
-              
-              if [ -z "$ASG_NAME" ]; then
-                echo "Failed to find Auto Scaling Group"
-                exit 1
-              fi
+            if [ -z "$ASG_NAME" ]; then
+              echo "Failed to find Auto Scaling Group"
+              exit 1
             fi
-            
-            echo "asg_name=$ASG_NAME" >> $GITHUB_OUTPUT
-            echo "Auto Scaling Group Name: $ASG_NAME"
+          fi
+          
+          echo "asg_name=$ASG_NAME" >> $GITHUB_OUTPUT
+          echo "Auto Scaling Group Name: $ASG_NAME"
 
       - name: Update Auto Scaling Group to Use Latest Launch Template Version
         run: |
