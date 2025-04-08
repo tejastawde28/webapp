@@ -37,6 +37,8 @@ jobs:
     name: Build Custom Image with Packer
     needs: integration-test
     runs-on: ubuntu-latest
+    outputs:
+      ami_id: ${{ steps.extract_ami.outputs.ami_id }}
 
     steps:
       - name: Checkout Repository
@@ -62,13 +64,13 @@ jobs:
           #   exit 1
           # fi
 
-      - name: Configure AWS Credentials
+      - name: Configure AWS Credentials (DEV Account)
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ vars.AWS_REGION }}
         run: |
-          echo "AWS credentials set."
+          echo "AWS DEV account credentials set."
 
       - name: Verify AWS Identity
         env:
@@ -88,26 +90,7 @@ jobs:
           PACKER_LOG_PATH: "packer.log"
         run: echo "Packer logging enabled."
 
-      # - name: Authenticate gcloud dev
-      #   env:
-      #     GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
-      #   run: |
-      #     echo '${{ secrets.GCP_CREDENTIALS }}' > gcloud-credentials-dev.json
-      #     gcloud auth activate-service-account --key-file=gcloud-credentials-dev.json
-
-      # - name: Authenticate gcloud demo
-      #   env:
-      #     GCP_DEMO_CREDENTIALS: ${{ secrets.GCP_DEMO_CREDENTIALS }}
-      #   run: |
-      #     echo '${{ secrets.GCP_DEMO_CREDENTIALS }}' > /tmp/demo-credentials.json
-      #     gcloud auth activate-service-account --key-file=/tmp/demo-credentials.json
-
-      # - name: Debug gcloud Auth
-      #   run: |
-      #     gcloud auth list
-      #     gcloud config list project
-
-      - name: Build Image with Packer and Capture Output
+      - name: Build Image with Packer
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -118,23 +101,22 @@ jobs:
           PACKER_LOG_PATH: "packer.log"
         run: |
           packer init packer/webapp.pkr.hcl
-          packer build packer/webapp.pkr.hcl
+          packer build -machine-readable packer/webapp.pkr.hcl | tee packer-output.log
 
-      # - name: Extract GCP Image Name
-      #   run: |
-      #     IMAGE_NAME=$(grep "googlecompute.webapp-image: A disk image was created in the 'devproject-452020' project:" packer-output.log | awk '{print $NF}')
-      #     echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
-
-      # - name: Copy GCP Image to Demo Project
-      #   env:
-      #     GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-      #     GCP_DEMO_PROJECT_ID: ${{ vars.GCP_DEMO_PROJECT_ID }}
-      #   run: |
-      #     gcloud compute images create "csye6225-webapp-demo" \
-      #       --source-image="${{ env.IMAGE_NAME }}" \
-      #       --source-image-project="${{ vars.GCP_PROJECT_ID }}" \
-      #       --project="${{ vars.GCP_DEMO_PROJECT_ID }}" \
-      #       --description="Copied from DEV project"
+      - name: Extract AMI ID
+        id: extract_ami
+        run: |
+          AMI_ID=$(grep "amazon-ebs.webapp-ami,artifact,0,id" packer-output.log | cut -d: -f2)
+          if [ -z "$AMI_ID" ]; then
+            echo "Failed to extract AMI ID, trying alternate format..."
+            AMI_ID=$(grep "artifact,0,id" packer-output.log | cut -d: -f2 | cut -d, -f2)
+            if [ -z "$AMI_ID" ]; then
+              echo "Failed to extract AMI ID"
+              exit 1
+            fi
+          fi
+          echo "ami_id=$AMI_ID" >> $GITHUB_OUTPUT
+          echo "AMI ID: $AMI_ID"
 
       - name: Upload Packer Logs
         if: always()
@@ -142,3 +124,100 @@ jobs:
         with:
           name: packer-logs
           path: packer.log
+
+  deploy-to-demo:
+    name: Deploy to DEMO Environment
+    needs: build-custom-image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS Credentials (DEMO Account)
+        env:
+          DEMO_AWS_ACCESS_KEY_ID: ${{ secrets.DEMO_AWS_ACCESS_KEY_ID }}
+          DEMO_AWS_SECRET_ACCESS_KEY: ${{ secrets.DEMO_AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ vars.AWS_REGION }}
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.DEMO_AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.DEMO_AWS_SECRET_ACCESS_KEY }}
+          aws configure set region ${{ vars.AWS_REGION }}
+          echo "DEMO AWS credentials set."
+
+      - name: Verify AWS Identity (DEMO Account)
+        run: aws sts get-caller-identity
+
+      - name: Get Current Launch Template
+        id: get_launch_template
+        run: |
+          LAUNCH_TEMPLATE_INFO=$(aws ec2 describe-launch-templates --launch-template-names webapp-launch-template)
+          LAUNCH_TEMPLATE_ID=$(echo $LAUNCH_TEMPLATE_INFO | jq -r '.LaunchTemplates[0].LaunchTemplateId')
+          LATEST_VERSION=$(echo $LAUNCH_TEMPLATE_INFO | jq -r '.LaunchTemplates[0].LatestVersionNumber')
+          echo "launch_template_id=$LAUNCH_TEMPLATE_ID" >> $GITHUB_OUTPUT
+          echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+          echo "Launch Template ID: $LAUNCH_TEMPLATE_ID, Latest Version: $LATEST_VERSION"
+
+      - name: Create New Launch Template Version with New AMI
+        id: create_template_version
+        run: |
+          NEW_VERSION=$(aws ec2 create-launch-template-version \
+            --launch-template-id ${{ steps.get_launch_template.outputs.launch_template_id }} \
+            --version-description "New AMI version from CI/CD pipeline" \
+            --source-version ${{ steps.get_launch_template.outputs.latest_version }} \
+            --launch-template-data '{"ImageId":"${{ needs.build-custom-image.outputs.ami_id }}"}' \
+            --query 'LaunchTemplateVersion.VersionNumber' --output text)
+          
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "New Launch Template Version: $NEW_VERSION"
+
+      - name: Get Auto Scaling Group Name
+        id: get_asg
+        run: |
+          ASG_NAME=$(aws autoscaling describe-auto-scaling-groups \
+            --query 'AutoScalingGroups[?contains(Tags[?Key==`Name`].Value, `webapp-asg`)].AutoScalingGroupName' \
+            --output text)
+          
+          if [ -z "$ASG_NAME" ]; then
+            echo "Failed to find Auto Scaling Group"
+            exit 1
+          fi
+          
+          echo "asg_name=$ASG_NAME" >> $GITHUB_OUTPUT
+          echo "Auto Scaling Group Name: $ASG_NAME"
+
+      - name: Update Auto Scaling Group to Use Latest Launch Template Version
+        run: |
+          aws autoscaling update-auto-scaling-group \
+            --auto-scaling-group-name ${{ steps.get_asg.outputs.asg_name }} \
+            --launch-template LaunchTemplateId=${{ steps.get_launch_template.outputs.launch_template_id }},Version='${{ steps.create_template_version.outputs.new_version }}'
+
+      - name: Start Instance Refresh
+        id: start_refresh
+        run: |
+          REFRESH_ID=$(aws autoscaling start-instance-refresh \
+            --auto-scaling-group-name ${{ steps.get_asg.outputs.asg_name }} \
+            --preferences '{"MinHealthyPercentage": 90}' \
+            --query 'InstanceRefreshId' --output text)
+          
+          echo "refresh_id=$REFRESH_ID" >> $GITHUB_OUTPUT
+          echo "Instance Refresh ID: $REFRESH_ID"
+
+      - name: Wait for Instance Refresh to Complete
+        run: |
+          while true; do
+            REFRESH_STATUS=$(aws autoscaling describe-instance-refreshes \
+              --auto-scaling-group-name ${{ steps.get_asg.outputs.asg_name }} \
+              --instance-refresh-ids ${{ steps.start_refresh.outputs.refresh_id }} \
+              --query 'InstanceRefreshes[0].Status' --output text)
+            
+            echo "Instance Refresh Status: $REFRESH_STATUS"
+            
+            if [ "$REFRESH_STATUS" == "Successful" ]; then
+              echo "Instance refresh completed successfully!"
+              break
+            elif [ "$REFRESH_STATUS" == "Failed" ] || [ "$REFRESH_STATUS" == "Cancelled" ]; then
+              echo "Instance refresh failed or was cancelled"
+              exit 1
+            fi
+            
+            echo "Waiting for instance refresh to complete..."
+            sleep 30
+          done

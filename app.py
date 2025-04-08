@@ -282,6 +282,89 @@ def health_check():
         statsd_client.timing('api.health_check.time', duration)
         return response
 
+@app.route('/cicd', methods=['GET'])
+def ci_cd():
+    start_time = time.time()
+    statsd_client.incr('api.health_check')
+    
+    if request.method not in ['GET']:
+        extra = {
+            'path': request.path,
+            'method': request.method,
+            'remote_addr': request.remote_addr
+        }
+        logger.warning(f"Method not allowed for health check endpoint", extra=extra)
+        return method_not_allowed(None)
+
+    if request.data or request.form or request.args:
+        extra = {
+            'path': request.path,
+            'method': request.method,
+            'remote_addr': request.remote_addr
+        }
+        logger.warning("Bad request: health check with parameters", extra=extra)
+        response = app.response_class(
+            response='',
+            status=400,
+            headers = {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'X-Content-Type-Options': 'nosniff'
+            }
+        )
+        
+        duration = (time.time() - start_time) * 1000
+        statsd_client.timing('api.health_check.time', duration)
+        return response
+    
+    try:
+        new_check = HealthCheck()
+        time_db_operation('health_check_insert', db.session.add, new_check)
+        time_db_operation('health_check_commit', db.session.commit)
+        
+        extra = {
+            'path': request.path,
+            'method': request.method,
+            'remote_addr': request.remote_addr,
+            'duration_ms': f"{(time.time() - start_time) * 1000:.2f}"
+        }
+        logger.info("Health check successful", extra=extra)
+
+        response = app.response_class(
+            response='',
+            status=200,
+            headers = {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'X-Content-Type-Options': 'nosniff'
+            }
+        )
+        duration = (time.time() - start_time) * 1000
+        statsd_client.timing('api.health_check.time', duration)
+        return response
+    
+    except Exception as e:
+        duration = (time.time() - start_time) * 1000
+        extra = {
+            'path': request.path,
+            'method': request.method,
+            'remote_addr': request.remote_addr,
+            'duration_ms': f"{duration:.2f}"
+        }
+        logger.error(f"Health check failed: {str(e)}", exc_info=True, extra=extra)
+        
+        response = app.response_class(
+            response='',
+            status=503,
+            headers = {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'X-Content-Type-Options': 'nosniff'
+            }
+        )
+        statsd_client.timing('api.health_check.time', duration)
+        return response
+
 @app.route('/v1/file', methods=['POST'])
 def upload_file():
     start_time = time.time()
