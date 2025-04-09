@@ -168,6 +168,14 @@ jobs:
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "New Launch Template Version: $NEW_VERSION"
 
+      - name: Set New Version as Default
+        run: |
+          aws ec2 modify-launch-template \
+            --launch-template-id ${{ steps.get_launch_template.outputs.launch_template_id }} \
+            --default-version ${{ steps.create_template_version.outputs.new_version }}
+          
+          echo "Set version ${{ steps.create_template_version.outputs.new_version }} as default"
+
       - name: Get Auto Scaling Group Name
         id: get_asg
         run: |
@@ -194,11 +202,7 @@ jobs:
           echo "asg_name=$ASG_NAME" >> $GITHUB_OUTPUT
           echo "Auto Scaling Group Name: $ASG_NAME"
 
-      - name: Update Auto Scaling Group to Use Latest Launch Template Version
-        run: |
-          aws autoscaling update-auto-scaling-group \
-            --auto-scaling-group-name ${{ steps.get_asg.outputs.asg_name }} \
-            --launch-template LaunchTemplateId=${{ steps.get_launch_template.outputs.launch_template_id }},Version='${{ steps.create_template_version.outputs.new_version }}'
+      # Removed the "Update Auto Scaling Group" step since ASG is already using $Latest
 
       - name: Start Instance Refresh
         id: start_refresh
