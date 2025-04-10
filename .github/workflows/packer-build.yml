@@ -218,21 +218,25 @@ jobs:
       - name: Wait for Instance Refresh to Complete
         run: |
           while true; do
-            REFRESH_STATUS=$(aws autoscaling describe-instance-refreshes \
-              --auto-scaling-group-name ${{ steps.get_asg.outputs.asg_name }} \
-              --instance-refresh-ids ${{ steps.start_refresh.outputs.refresh_id }} \
-              --query 'InstanceRefreshes[0].Status' --output text)
-            
-            echo "Instance Refresh Status: $REFRESH_STATUS"
-            
-            if [ "$REFRESH_STATUS" == "Successful" ]; then
-              echo "Instance refresh completed successfully!"
-              break
-            elif [ "$REFRESH_STATUS" == "Failed" ] || [ "$REFRESH_STATUS" == "Cancelled" ]; then
-              echo "Instance refresh failed or was cancelled"
-              exit 1
-            fi
-            
-            echo "Waiting for instance refresh to complete..."
-            sleep 30
-          done
+          REFRESH_INFO=$(aws autoscaling describe-instance-refreshes \
+            --auto-scaling-group-name ${{ steps.get_asg.outputs.asg_name }} \
+            --instance-refresh-ids ${{ steps.start_refresh.outputs.refresh_id }} \
+            --query 'InstanceRefreshes[0]' --output json)
+          
+          REFRESH_STATUS=$(echo $REFRESH_INFO | jq -r '.Status')
+          PROGRESS_PERCENTAGE=$(echo $REFRESH_INFO | jq -r '.PercentageComplete // 0')
+          
+          echo "Instance Refresh Status: $REFRESH_STATUS"
+          echo "Progress: $PROGRESS_PERCENTAGE%"
+          
+          if [ "$REFRESH_STATUS" == "Successful" ]; then
+            echo "Instance refresh completed successfully!"
+            break
+          elif [ "$REFRESH_STATUS" == "Failed" ] || [ "$REFRESH_STATUS" == "Cancelled" ]; then
+            echo "Instance refresh failed or was cancelled"
+            exit 1
+          fi
+          
+          echo "Waiting for instance refresh to complete..."
+          sleep 30
+            done
