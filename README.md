@@ -94,3 +94,13 @@ set TESTING=True
 pytest --verbose
 ```
 
+
+## Command to Import Certificate to AWS
+```sh
+sudo aws acm import-certificate \
+  --certificate fileb://<path-to-certificate-file> \
+  --private-key fileb://<path-to-private-key-file> \
+  --certificate-chain fileb://<path-to-certificate-chain-file> \
+  --profile <aws-profile>
+```
+> Make sure to include the actual path of your respective files in the placeholder
